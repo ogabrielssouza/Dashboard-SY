@@ -180,7 +180,7 @@ export default function Home() {
       <AutoRefresh seconds={30} />
       <header>
         <h1 className={pageTitle}>Painel</h1>
-        <p className={pageSubtitle}>Visão geral da Implantação 6D.</p>
+        <p className={pageSubtitle}>Visão geral da SY Acquisition.</p>
       </header>
 
       <ResultadoBlock />

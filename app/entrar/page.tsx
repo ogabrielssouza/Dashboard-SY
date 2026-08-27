@@ -9,8 +9,8 @@ export default function EntrarPage() {
     <div className="mx-auto mt-20 max-w-sm">
       <div className={`p-6 ${card}`}>
         <div className="mb-6 flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-base font-bold text-black">
-            6D
+          <span className="flex h-8 w-11 items-center justify-center rounded-lg bg-emerald-500 text-sm font-bold tracking-tight text-black">
+            DSYA
           </span>
           <div>
             <h1 className="text-lg font-bold leading-tight text-zinc-50">Entrar no painel</h1>

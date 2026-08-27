@@ -16,10 +16,10 @@ const NAV = [
 function Brand() {
   return (
     <Link href="/" className="flex items-center gap-2 px-3 text-[17px] font-semibold tracking-[-0.02em] text-zinc-50">
-      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500 text-sm font-bold text-black">
-        6D
+      <span className="flex h-7 w-9 items-center justify-center rounded-lg bg-emerald-500 text-xs font-bold tracking-tight text-black">
+        DSYA
       </span>
-      Implantação 6D
+      Dashboard SY Acquisition
     </Link>
   );
 }

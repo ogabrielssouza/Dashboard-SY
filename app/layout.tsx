@@ -6,8 +6,8 @@ import AppShell from "./app-shell";
 const sora = Sora({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Implantação 6D — Dashboard",
-  description: "Painel interno da Implantação 6D.",
+  title: "Dashboard SY Acquisition",
+  description: "Painel interno da SY Acquisition.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
