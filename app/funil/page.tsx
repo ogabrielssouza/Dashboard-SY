@@ -32,8 +32,10 @@ export const dynamic = "force-dynamic";
 const fmtMoeda = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
+// created_at é timestamptz (instante real) — precisa do fuso explícito, senão
+// um lead criado às 22h (Brasília) aparece com a data do dia seguinte.
 const fmtData = (d: Date) =>
-  new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
 
 const fmtPct = (n: number, total: number) => (total ? `${Math.round((n / total) * 100)}%` : "—");
 

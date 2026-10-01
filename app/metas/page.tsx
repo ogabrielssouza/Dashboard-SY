@@ -197,7 +197,12 @@ export default async function MetasPage() {
         <div className="mb-3 flex items-center justify-between">
           <h3 className={sectionTitle}>Dia — rotina</h3>
           <span className={eyebrow}>
-            {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })}
+            {new Date().toLocaleDateString("pt-BR", {
+              weekday: "long",
+              day: "2-digit",
+              month: "2-digit",
+              timeZone: "America/Sao_Paulo",
+            })}
           </span>
         </div>
 

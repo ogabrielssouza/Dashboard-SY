@@ -215,9 +215,19 @@ export type ResumoOperacao = {
   serie: SerieDia[];
 };
 
+// Agrupa por dia/mês no calendário de Brasília, não em UTC — senão uma venda
+// fechada às 22h (horário de Brasília) cai no dia seguinte no gráfico, já
+// que esse horário já é "amanhã" em UTC.
+const TZ_FMT_DIA = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Sao_Paulo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 function chaveAgrupamento(d: Date, porMes: boolean): string {
-  const iso = d.toISOString();
-  return porMes ? iso.slice(0, 7) : iso.slice(0, 10);
+  const chave = TZ_FMT_DIA.format(d); // YYYY-MM-DD, já no fuso de Brasília
+  return porMes ? chave.slice(0, 7) : chave;
 }
 
 export async function resumoOperacao(dias: number | null): Promise<ResumoOperacao> {
@@ -337,10 +347,13 @@ export type RotinaTarefa = {
 
 export async function listTarefasHoje(): Promise<(RotinaTarefa & { concluida: boolean })[]> {
   await ensureSchema();
+  // "Hoje" em horário de Brasília, não current_date (que segue o fuso da
+  // sessão do Postgres — UTC no Neon, o que resetaria a rotina 3h cedo demais).
   return (await sql()`
     select t.*, coalesce(r.concluida, false) as concluida
     from rotina_tarefas t
-    left join rotina_registros r on r.tarefa_id = t.id and r.data = current_date
+    left join rotina_registros r
+      on r.tarefa_id = t.id and r.data = (now() at time zone 'America/Sao_Paulo')::date
     order by t.ordem, t.created_at
   `) as (RotinaTarefa & { concluida: boolean })[];
 }
@@ -362,7 +375,7 @@ export async function marcarTarefa(tarefaId: string, concluida: boolean): Promis
   await ensureSchema();
   await sql()`
     insert into rotina_registros (tarefa_id, data, concluida)
-    values (${tarefaId}, current_date, ${concluida})
+    values (${tarefaId}, (now() at time zone 'America/Sao_Paulo')::date, ${concluida})
     on conflict (tarefa_id, data) do update set concluida = excluded.concluida
   `;
 }

@@ -1,6 +1,15 @@
 // Cálculo de janelas de tempo (ano/semestre/trimestre/mês/semana) usadas nas
-// Metas. Tudo em hora local do servidor — para uma operação de time único,
-// isso é suficiente e evita a complexidade de fuso por usuário.
+// Metas.
+//
+// Tudo é ancorado em horário de Brasília (America/Sao_Paulo), não no fuso do
+// servidor: na Vercel o runtime roda em UTC, então "hoje"/"este mês" calculado
+// com Date.getFullYear()/getMonth()/getDate() (que lê o fuso local do
+// processo) viraria o dia seguinte 3h mais cedo do que no relógio real do
+// negócio. Como o Brasil não tem mais horário de verão desde 2019,
+// America/Sao_Paulo é UTC-3 o ano inteiro — dá pra tratar como offset fixo.
+
+const TZ = "America/Sao_Paulo";
+const BR_OFFSET_HOURS = 3;
 
 export type Periodo = {
   tipo: "ano" | "semestre" | "trimestre" | "mes" | "semana";
@@ -14,18 +23,49 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-// Semana ISO-8601: começa na segunda-feira.
-function isoWeekInfo(d: Date): { ano: number; semana: number; inicio: Date } {
-  const data = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const diaSemana = data.getUTCDay() || 7; // domingo vira 7
-  data.setUTCDate(data.getUTCDate() + 4 - diaSemana); // quinta-feira da mesma semana
-  const anoIso = data.getUTCFullYear();
-  const inicioAno = new Date(Date.UTC(anoIso, 0, 1));
-  const semana = Math.ceil(((data.getTime() - inicioAno.getTime()) / 86_400_000 + 1) / 7);
+// Ano/mês(1-12)/dia desse instante, no calendário de Brasília.
+function brasiliaYMD(instante: Date): { ano: number; mes: number; dia: number } {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const [ano, mes, dia] = fmt.format(instante).split("-").map(Number);
+  return { ano, mes, dia };
+}
 
-  const segunda = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+// Instante UTC correspondente à meia-noite de Brasília naquele dia (mes 1-12).
+// Date.UTC normaliza overflow sozinho (mes=13 vira janeiro do ano seguinte).
+function brasiliaMeiaNoiteUTC(ano: number, mes: number, dia: number): Date {
+  return new Date(Date.UTC(ano, mes - 1, dia, BR_OFFSET_HOURS, 0, 0));
+}
+
+// Semana ISO-8601 (começa na segunda) a partir de um ano/mês/dia já em
+// calendário de Brasília. A aritmética em si é só contagem de dias, então
+// pode rodar sobre um Date "neutro" em UTC sem reintroduzir fuso do servidor.
+function semanaIsoDeYMD(
+  ano: number,
+  mes: number,
+  dia: number
+): { anoIso: number; semana: number; segunda: { ano: number; mes: number; dia: number } } {
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  const diaSemana = data.getUTCDay() || 7; // domingo vira 7
+
+  const quinta = new Date(data);
+  quinta.setUTCDate(quinta.getUTCDate() + 4 - diaSemana);
+  const anoIso = quinta.getUTCFullYear();
+  const inicioAnoIso = new Date(Date.UTC(anoIso, 0, 1));
+  const semana = Math.ceil(((quinta.getTime() - inicioAnoIso.getTime()) / 86_400_000 + 1) / 7);
+
+  const segunda = new Date(data);
   segunda.setUTCDate(segunda.getUTCDate() - (diaSemana - 1));
-  return { ano: anoIso, semana, inicio: segunda };
+
+  return {
+    anoIso,
+    semana,
+    segunda: { ano: segunda.getUTCFullYear(), mes: segunda.getUTCMonth() + 1, dia: segunda.getUTCDate() },
+  };
 }
 
 export function periodosAtuais(agora = new Date()): {
@@ -35,46 +75,48 @@ export function periodosAtuais(agora = new Date()): {
   mes: Periodo;
   semana: Periodo;
 } {
-  const ano = agora.getFullYear();
-  const mes = agora.getMonth(); // 0-11
+  const { ano, mes: mesNum, dia } = brasiliaYMD(agora); // mesNum: 1-12
 
   const anoP: Periodo = {
     tipo: "ano",
     periodo: `${ano}`,
     label: `${ano}`,
-    inicio: new Date(ano, 0, 1),
-    fim: new Date(ano + 1, 0, 1),
+    inicio: brasiliaMeiaNoiteUTC(ano, 1, 1),
+    fim: brasiliaMeiaNoiteUTC(ano + 1, 1, 1),
   };
 
-  const semNum = mes < 6 ? 1 : 2;
+  const semNum = mesNum <= 6 ? 1 : 2;
   const semestreP: Periodo = {
     tipo: "semestre",
     periodo: `${ano}-S${semNum}`,
     label: `${semNum}º semestre`,
-    inicio: new Date(ano, semNum === 1 ? 0 : 6, 1),
-    fim: new Date(ano, semNum === 1 ? 6 : 12, 1),
+    inicio: brasiliaMeiaNoiteUTC(ano, semNum === 1 ? 1 : 7, 1),
+    fim: brasiliaMeiaNoiteUTC(ano, semNum === 1 ? 7 : 13, 1),
   };
 
-  const triNum = Math.floor(mes / 3) + 1;
+  const triNum = Math.floor((mesNum - 1) / 3) + 1;
   const trimestreP: Periodo = {
     tipo: "trimestre",
     periodo: `${ano}-Q${triNum}`,
     label: `${triNum}º trimestre`,
-    inicio: new Date(ano, (triNum - 1) * 3, 1),
-    fim: new Date(ano, triNum * 3, 1),
+    inicio: brasiliaMeiaNoiteUTC(ano, (triNum - 1) * 3 + 1, 1),
+    fim: brasiliaMeiaNoiteUTC(ano, triNum * 3 + 1, 1),
   };
 
   const mesP: Periodo = {
     tipo: "mes",
-    periodo: `${ano}-${pad(mes + 1)}`,
-    label: new Date(ano, mes, 1).toLocaleDateString("pt-BR", { month: "long" }),
-    inicio: new Date(ano, mes, 1),
-    fim: new Date(ano, mes + 1, 1),
+    periodo: `${ano}-${pad(mesNum)}`,
+    label: brasiliaMeiaNoiteUTC(ano, mesNum, 1).toLocaleDateString("pt-BR", {
+      month: "long",
+      timeZone: TZ,
+    }),
+    inicio: brasiliaMeiaNoiteUTC(ano, mesNum, 1),
+    fim: brasiliaMeiaNoiteUTC(ano, mesNum + 1, 1),
   };
 
-  const { ano: anoIso, semana, inicio: inicioSemana } = isoWeekInfo(agora);
-  const fimSemana = new Date(inicioSemana);
-  fimSemana.setUTCDate(fimSemana.getUTCDate() + 7);
+  const { anoIso, semana, segunda } = semanaIsoDeYMD(ano, mesNum, dia);
+  const inicioSemana = brasiliaMeiaNoiteUTC(segunda.ano, segunda.mes, segunda.dia);
+  const fimSemana = new Date(inicioSemana.getTime() + 7 * 86_400_000);
   const semanaP: Periodo = {
     tipo: "semana",
     periodo: `${anoIso}-W${pad(semana)}`,
@@ -101,13 +143,13 @@ export function mesesDoTrimestre(periodoTrimestre: string): string[] {
 export function semanasNoMes(periodoMes: string): number {
   const [anoStr, mesStr] = periodoMes.split("-");
   const ano = Number(anoStr);
-  const mes = Number(mesStr) - 1;
+  const mes = Number(mesStr); // 1-12
   const semanas = new Set<string>();
-  const d = new Date(ano, mes, 1);
-  while (d.getMonth() === mes) {
-    const { ano: ai, semana } = isoWeekInfo(d);
-    semanas.add(`${ai}-W${pad(semana)}`);
-    d.setDate(d.getDate() + 1);
+
+  const ultimoDia = new Date(Date.UTC(ano, mes, 0)).getUTCDate(); // dia 0 do mês seguinte = último dia deste mês
+  for (let dia = 1; dia <= ultimoDia; dia++) {
+    const { anoIso, semana } = semanaIsoDeYMD(ano, mes, dia);
+    semanas.add(`${anoIso}-W${pad(semana)}`);
   }
   return semanas.size;
 }

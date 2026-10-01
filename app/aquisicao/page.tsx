@@ -33,8 +33,23 @@ const PERIODOS = [
 const fmtMoeda = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
+// s.data é um DATE puro (sem hora/fuso) — formata direto, sem timeZone: ele
+// já representa o dia certo porque uma string "YYYY-MM-DD" vira meia-noite
+// UTC desse mesmo dia, e sem passar timeZone o toLocaleDateString lê os
+// componentes de calendário (ano/mês/dia) tal como estão, sem reconverter.
 const fmtData = (d: string | Date) =>
-  new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
+
+// "Hoje" em horário de Brasília, pra pré-preencher o formulário de novo
+// investimento — Date.toISOString() usaria o dia em UTC, que vira amanhã
+// entre 21h e meia-noite no horário de Brasília.
+const hojeBrasilia = () =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 
 export default async function AquisicaoPage({
   searchParams,
@@ -160,7 +175,7 @@ export default async function AquisicaoPage({
               name="data"
               type="date"
               required
-              defaultValue={new Date().toISOString().slice(0, 10)}
+              defaultValue={hojeBrasilia()}
               className={input}
             />
           </div>
