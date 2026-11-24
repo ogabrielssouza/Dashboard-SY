@@ -8,6 +8,7 @@ const PUBLIC_PATHS = ["/entrar"];
 
 const NAV = [
   { href: "/", label: "Painel" },
+  { href: "/crm", label: "CRM" },
   { href: "/funil", label: "Funil de Vendas" },
   { href: "/aquisicao", label: "Aquisição" },
   { href: "/metas", label: "Metas" },
